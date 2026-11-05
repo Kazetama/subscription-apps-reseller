@@ -42,7 +42,7 @@ const TRUST_FEATURES = [
   },
 ]
 
-export function Hero({ onQuickOrder }: HeroProps) {
+export function Hero({}: HeroProps = {}) {
   return (
     <section className="relative overflow-hidden pt-10 pb-16 md:pt-16 md:pb-24 border-b border-border">
       {/* Background Subtle Gradient Glow */}

@@ -1,11 +1,12 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import React, { useState, useMemo, useEffect } from 'react'
 import { Search, SlidersHorizontal, PackageOpen, RotateCcw } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { ProductCard } from './ProductCard'
 import { MOCK_CATEGORIES, MOCK_PRODUCTS } from '@/lib/mock-data'
+import { useCatalogStore } from '@/lib/catalog-store'
 import { Product, ProductPackage } from '@/types/store'
 
 interface ProductCatalogProps {
@@ -13,43 +14,61 @@ interface ProductCatalogProps {
 }
 
 export function ProductCatalog({ onQuickOrder }: ProductCatalogProps) {
+  const [hasMounted, setHasMounted] = useState(false)
+  const storeCategories = useCatalogStore((state) => state.categories)
+  const storeProducts = useCatalogStore((state) => state.products)
+
+  useEffect(() => {
+    setHasMounted(true)
+  }, [])
+
+  const categories = hasMounted ? storeCategories : MOCK_CATEGORIES
+  const rawProducts = hasMounted ? storeProducts : MOCK_PRODUCTS
+
   const [selectedCategory, setSelectedCategory] = useState<string>('cat-all')
   const [searchQuery, setSearchQuery] = useState<string>('')
   const [sortBy, setSortBy] = useState<'featured' | 'price-asc' | 'price-desc' | 'name'>('featured')
 
+  // Only show active products on storefront
+  const activeProducts = useMemo(() => {
+    return rawProducts.filter((p) => p.isActive !== false)
+  }, [rawProducts])
+
   const filteredProducts = useMemo(() => {
-    return MOCK_PRODUCTS.filter((product) => {
-      if (selectedCategory !== 'cat-all' && product.categoryId !== selectedCategory) {
-        return false
-      }
-      if (searchQuery.trim() !== '') {
-        const query = searchQuery.toLowerCase()
-        const matchName = product.name.toLowerCase().includes(query)
-        const matchDesc = product.description.toLowerCase().includes(query)
-        const matchTagline = product.tagline.toLowerCase().includes(query)
-        const matchCategory = product.categoryName?.toLowerCase().includes(query)
-        if (!matchName && !matchDesc && !matchTagline && !matchCategory) {
+    return activeProducts
+      .filter((product) => {
+        if (selectedCategory !== 'cat-all' && product.categoryId !== selectedCategory) {
           return false
         }
-      }
-      return true
-    }).sort((a, b) => {
-      if (sortBy === 'price-asc') {
-        const minA = Math.min(...a.packages.map((p) => p.price))
-        const minB = Math.min(...b.packages.map((p) => p.price))
-        return minA - minB
-      }
-      if (sortBy === 'price-desc') {
-        const minA = Math.min(...a.packages.map((p) => p.price))
-        const minB = Math.min(...b.packages.map((p) => p.price))
-        return minB - minA
-      }
-      if (sortBy === 'name') {
-        return a.name.localeCompare(b.name)
-      }
-      return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0)
-    })
-  }, [selectedCategory, searchQuery, sortBy])
+        if (searchQuery.trim() !== '') {
+          const query = searchQuery.toLowerCase()
+          const matchName = product.name.toLowerCase().includes(query)
+          const matchDesc = product.description?.toLowerCase().includes(query)
+          const matchTagline = product.tagline?.toLowerCase().includes(query)
+          const matchCategory = product.categoryName?.toLowerCase().includes(query)
+          if (!matchName && !matchDesc && !matchTagline && !matchCategory) {
+            return false
+          }
+        }
+        return true
+      })
+      .sort((a, b) => {
+        if (sortBy === 'price-asc') {
+          const minA = a.packages.length > 0 ? Math.min(...a.packages.map((p) => p.price)) : 0
+          const minB = b.packages.length > 0 ? Math.min(...b.packages.map((p) => p.price)) : 0
+          return minA - minB
+        }
+        if (sortBy === 'price-desc') {
+          const minA = a.packages.length > 0 ? Math.min(...a.packages.map((p) => p.price)) : 0
+          const minB = b.packages.length > 0 ? Math.min(...b.packages.map((p) => p.price)) : 0
+          return minB - minA
+        }
+        if (sortBy === 'name') {
+          return a.name.localeCompare(b.name)
+        }
+        return (b.isFeatured ? 1 : 0) - (a.isFeatured ? 1 : 0)
+      })
+  }, [activeProducts, selectedCategory, searchQuery, sortBy])
 
   const handleResetFilters = () => {
     setSelectedCategory('cat-all')
@@ -75,7 +94,7 @@ export function ProductCatalog({ onQuickOrder }: ProductCatalogProps) {
 
         {/* Category Tabs */}
         <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-          {MOCK_CATEGORIES.map((cat) => {
+          {categories.map((cat) => {
             const isSelected = selectedCategory === cat.id
             return (
               <button
@@ -114,7 +133,7 @@ export function ProductCatalog({ onQuickOrder }: ProductCatalogProps) {
               <SlidersHorizontal className="size-3.5 text-muted-foreground" />
               <select
                 value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
+                onChange={(e) => setSortBy(e.target.value as 'featured' | 'price-asc' | 'price-desc' | 'name')}
                 className="bg-transparent text-[13px] font-medium text-foreground border-none focus:outline-hidden cursor-pointer"
               >
                 <option value="featured" className="bg-card text-foreground">Populer</option>
